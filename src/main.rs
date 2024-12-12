@@ -6,10 +6,12 @@ use tokio::{
     sync::Mutex,
 };
 
+mod http;
+
 struct User(String, bool);
 
 impl User {
-    pub fn parse(s: &String) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         if s.contains("|INFO")
             && (s.contains("|client connected '") || s.contains("|client disconnected '"))
         {
@@ -30,25 +32,34 @@ impl User {
     }
 }
 
-struct OnlineUsers(HashMap<String, bool>);
+struct OnlineUsers {
+    users: HashMap<String, bool>,
+    updated_at: String,
+}
 type ArcOnlineUsers = Arc<Mutex<OnlineUsers>>;
 
 impl OnlineUsers {
     pub fn new() -> Self {
-        Self(HashMap::new())
+        Self {
+            users: HashMap::new(),
+            updated_at: String::new(),
+        }
     }
-    pub fn print_status(&self, timestamp: &str) {
-        println!();
-        println!("-----Online users-----");
-        println!("   {timestamp}   ");
-        println!("----------------------");
+    pub fn get_status_display(&self) -> String {
+        let mut lines = vec![
+            "-----Online users-----".to_string(),
+            format!("   {}   ", self.updated_at),
+            "----------------------".to_string(),
+        ];
 
-        for (user, online) in &self.0 {
+        for (user, online) in &self.users {
             if !online {
                 continue;
             };
-            println!("{user}");
+            lines.push(user.to_string())
         }
+
+        lines.join("\n")
     }
 }
 
@@ -73,7 +84,16 @@ async fn main() -> anyhow::Result<()> {
 
     let parser_handle = parse_logs(stdout, online_users.clone());
 
-    let _ = parser_handle.await;
+    let http_server = http::start(online_users).await?;
+
+    tokio::select! {
+        _ = parser_handle => {},
+        result = http_server => {
+            if let Err(err) = result {
+                eprintln!("{}", err);
+            }
+        },
+    }
 
     Ok(())
 }
@@ -88,9 +108,11 @@ fn parse_logs(stdout: ChildStdout, online_users: ArcOnlineUsers) -> tokio::task:
                 let timestamp = format!("{} {} {}", parts[0], parts[1], parts[2]);
 
                 let mut lock = online_users.lock().await;
-                lock.0.insert(user.0, user.1);
+                lock.users.insert(user.0, user.1);
+                lock.updated_at = timestamp;
 
-                lock.print_status(&timestamp);
+                let userlist = lock.get_status_display();
+                println!("{userlist}");
             }
         }
     })
