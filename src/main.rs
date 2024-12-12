@@ -6,6 +6,7 @@ use tokio::{
     sync::Mutex,
 };
 
+mod config;
 mod http;
 
 struct User(String, bool);
@@ -65,15 +66,16 @@ impl OnlineUsers {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut journalctl_process = tokio::process::Command::new("journalctl")
-        .args([
-            "-f",
-            "-u",
-            "teamspeak3-server.service",
-            "--no-pager",
-            "--since",
-            "-3d",
-        ])
+    let config = config::parse_args();
+
+    let mut journalctl_command = tokio::process::Command::new("journalctl");
+    journalctl_command.args(["-f", "-u", &config.unit, "--no-pager"]);
+    if let Some(since) = config.since.as_ref() {
+        journalctl_command.arg("--since");
+        journalctl_command.arg(since);
+    }
+
+    let mut journalctl_process = journalctl_command
         .stdout(Stdio::piped())
         .kill_on_drop(true)
         .spawn()?;
@@ -84,15 +86,19 @@ async fn main() -> anyhow::Result<()> {
 
     let parser_handle = parse_logs(stdout, online_users.clone());
 
-    let http_server = http::start(online_users).await?;
+    if config.serve_http {
+        let http_server = http::start(online_users, config.port).await?;
 
-    tokio::select! {
-        _ = parser_handle => {},
-        result = http_server => {
-            if let Err(err) = result {
-                eprintln!("{}", err);
-            }
-        },
+        tokio::select! {
+            _ = parser_handle => {},
+            result = http_server => {
+                if let Err(err) = result {
+                    eprintln!("{}", err);
+                }
+            },
+        }
+    } else {
+        let _ = parser_handle.await;
     }
 
     Ok(())

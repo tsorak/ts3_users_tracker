@@ -1,0 +1,19 @@
+# /usr/lib/systemd/system/ts3_users_tracker.service
+[Unit]
+Description=TeamSpeak3 Users Tracker
+After=teamspeak3-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=true
+User=teamspeak
+Group=systemd-journal
+ExecStart=/usr/bin/ts3_users_tracker --serve-http --port 80 --since=-3d
+
+# Allow binding on port 80
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target

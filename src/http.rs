@@ -9,11 +9,12 @@ use crate::ArcOnlineUsers;
 
 pub async fn start(
     users: ArcOnlineUsers,
+    port: u16,
 ) -> anyhow::Result<axum::serve::Serve<axum::Router, axum::Router>> {
     let router = Router::new().route("/", get(handler));
 
-    let addr = "0.0.0.0:3000";
-    let listener = tokio::net::TcpListener::bind(addr)
+    let addr = format!("0.0.0.0:{port}");
+    let listener = tokio::net::TcpListener::bind(&addr)
         .await
         .map_err(|err| anyhow::anyhow!("Failed to bind listener on '{addr}', {err}"))?;
     Ok(axum::serve(listener, router.with_state(users)))
