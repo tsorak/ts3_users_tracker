@@ -14,11 +14,19 @@ pub struct Config {
 
     #[arg(
         long,
-        help = "How far back to read logs from.\nSee journalctl '--since' for appropriate formatting"
+        help = "How far back to read logs from. (Defaults to unit start date)\nSee journalctl '--since' for appropriate formatting"
     )]
     pub since: Option<String>,
 }
 
-pub fn parse_args() -> Config {
-    Config::parse()
+pub async fn parse_args() -> Config {
+    let mut cfg = Config::parse();
+
+    if cfg.since.is_none() {
+        if let Ok(unit_start_date) = crate::journal::get_unit_start_date(&cfg).await {
+            let _ = cfg.since.insert(unit_start_date);
+        };
+    }
+
+    cfg
 }

@@ -8,6 +8,7 @@ use tokio::{
 
 mod config;
 mod http;
+mod journal;
 
 struct User(String, bool);
 
@@ -66,16 +67,9 @@ impl OnlineUsers {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = config::parse_args();
+    let config = config::parse_args().await;
 
-    let mut journalctl_command = tokio::process::Command::new("journalctl");
-    journalctl_command.args(["-f", "-u", &config.unit, "--no-pager"]);
-    if let Some(since) = config.since.as_ref() {
-        journalctl_command.arg("--since");
-        journalctl_command.arg(since);
-    }
-
-    let mut journalctl_process = journalctl_command
+    let mut journalctl_process = journal::reader(&config)
         .stdout(Stdio::piped())
         .kill_on_drop(true)
         .spawn()?;
