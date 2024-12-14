@@ -4,7 +4,7 @@
 
 ```sh
 git clone https://github.com/tsorak/ts3_users_tracker
-cd pkg
+cd ts3_users_tracker/pkg
 makepkg -sic
 ```
 
