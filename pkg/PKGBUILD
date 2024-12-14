@@ -1,0 +1,27 @@
+# Maintainer: Karl Osterberg <karost0249@gmail.com>
+pkgname=ts3_users_tracker
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Tracks which users are online on your teamspeak3 server"
+arch=('x86_64')
+url="https://github.com/tsorak/ts3_users_tracker"
+license=('MIT')
+depends=('teamspeak3-server' 'systemd')
+makedepends=('cargo')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$pkgname-$pkgver"
+    cargo build --release --locked
+}
+
+package() {
+    cd "$pkgname-$pkgver"
+    install -Dm755 "target/release/$pkgname" "$pkgdir/usr/bin/$pkgname"
+
+    mkdir -p "$pkgdir/usr/lib/systemd/system/"
+    cp ts3_users_tracker.service "$pkgdir/usr/lib/systemd/system/"
+
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
